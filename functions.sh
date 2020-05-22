@@ -2,12 +2,64 @@
 
 # ask for missing parameters
 getarg () {
-        ENVVALUE=$(set |grep $1 |awk -F= '{print $2}')
-        if [ "$ENVVALUE" = "" ]
+        ENVVALUE=${$(echo $1):-NoValue}
+        if [ "$ENVVALUE" = "NoValue" ]
         then
                 read -p "Please enter a value for $(echo $1): " $(echo $1)
         fi
+        echo ${$1}
 }
+
+if [ "$0" = "-bash" ]
+then
+    echo "Setting up the following variables for successful execution of shell functions..."
+    echo -e '\t'rgName
+    rgName=myrg
+    echo -e '\t'location
+    location=southindia
+    echo -e '\t'vnetName
+    vnetName=myvnet
+    echo -e '\t'subnetDMZ
+    subnetDMZ=dmz-subnet
+    echo -e '\t'subnetApps
+    subnetApps=apps-subnet
+    echo -e '\t'subnetCommmon
+    subnetCommmon=common-subnet
+    echo -e '\t'adminUser
+    adminUser=vmadmin
+    echo -e '\t'adminPassword
+    adminPassword=Pa55w0rd@312
+    echo -e '\t'storageType
+    storageType=Standard_LRS
+    echo -e '\t'image
+    image=UbuntuLTS
+    echo -e '\t'fileshareName
+    fileshareName=azfileshare8bf
+    echo -e \\n"Please change values of these variables as necessary."
+
+    echo -e \\n"Functions:"
+    echo -e "Create the resource group and vnet -"
+    echo "createbaseinfra resource-group-nane location vnet-name vnet-cidr-address-range"
+
+    echo -e \\n"Create the resource group and vnet -"
+    echo "createsubnet name-of-subnet vnet-name subnet-cidr-address-range nsg-ports-to-open"
+
+    echo -e \\n"Create VMs with external load balancer (L4) -"
+    echo "createextlb lb-name subnet-name vm-name-prefix number-of-vm vm-size os-disk-size data-disk-size-if-needed"
+
+    echo -e \\n"Create VMs with internal load balancer (L4) -"
+    echo "createintlb lb-name subnet-name vm-name-prefix number-of-vm vm-size os-disk-size data-disk-size-if-needed"
+
+    echo -e \\n"Create VMs with public application gateway (L7) -"
+    echo "createappgw appgw-name subnet-name vm-name-prefix number-of-vm vm-size os-disk-size data-disk-size-if-needed"
+
+    echo -e \\n"Create VMs with internal application gateway (L7) -"
+    echo "createintappgw appgw-name subnet-name vm-name-prefix number-of-vms vm-size os-disks-size data-disk-size ports-for-appgw-rules"
+
+    echo -e \\n"Create standalone VMs - no lb/appgw -"
+    echo "createvms vm-name-prefix subnet-name number-of-vm vm-size os-disk-size data-disk-size public-ip-if-needed"
+    echo ""
+fi
 
 # create VMs
 createvms () {
@@ -20,7 +72,7 @@ createvms () {
     publicIPName=$7
 
     echo -e \\n creating $(echo $vmName) VMs in $(echo $subnetName) subnet...
-    if [ !$6 ]
+    if [ ! $dataDiskSize ]
     then
         for i in `seq $numVM`; do
             az vm create -n $(echo $vmName)_$i -g $rgName --image $image --size $(echo $vmSize) \
@@ -40,6 +92,70 @@ createvms () {
     fi
 }
 
+# clone VM
+clonevm () {
+    vmName=$1
+    newVmName=$2
+    subnetName=$3
+    numVM=$4
+    vmSize=$5
+    osDiskSize=$6
+    dataDiskSize=$7
+    publicIPName=$8
+
+    diskId=$(az vm show -n $vmName -g $rgName -o tsv --query storageProfile.osDisk.managedDisk.id)
+    diskSize=$(az vm show -n $vmName -g $rgName -o tsv --query storageProfile.osDisk.diskSizeGb)
+    osType=$(az vm show -n $vmName -g $rgName -o tsv --query storageProfile.osDisk.osType)
+
+    echo -e \\n creating $(echo $vmName) clone VMs in $(echo $subnetName) subnet...
+    if [ ! $dataDiskSize ]
+    then
+        for i in `seq $numVM`; do
+            if [ "$publicIPName" ]
+            then
+                publicIP=$(echo $publicIPName)_$i
+            else
+                publicIP=""
+            fi
+
+            echo -e \\n creating copy of the OS disk...
+            az disk create -g $rgName -n $(echo $newVmName)_$(echo $i)_osDisk --sku $storageType --source $diskId
+
+            echo -e \\n creating $(echo $newVmName)_$(echo $i)...
+            az vm create -n $(echo $newVmName)_$(echo $i) -g $rgName --size $(echo $vmSize) --attach-os-disk $(echo $newVmName)_$(echo $i)_osDisk \
+                --nsg "" --public-ip-address "$publicIP" \
+                --vnet-name $vnetName --subnet $(echo $subnetName) \
+                --os-type $osType --os-disk-size-gb $(echo $osDiskSize)
+
+            echo -e \\n setting hostname and rebooting VM...
+            az vm run-command invoke -g $rgName -n $(echo $newVmName)_$(echo $i) --command-id RunShellScript --scripts \
+                'sudo hostnamectl set-hostname $1 && sudo reboot' --parameters $(echo $newVmName)_$(echo $i)
+        done
+    else
+        for i in `seq $numVM`; do
+            if [ "$publicIPName" ]
+            then
+                publicIP=$(echo $publicIPName)_$i
+            else
+                publicIP=""
+            fi
+
+            echo -e \\n creating copy of the OS disk...
+            az disk create -g $rgName -n $(echo $newVmName)_$(echo $i)_osDisk --sku $storageType --source $diskId
+
+            echo -e \\n creating $(echo $newVmName)_$(echo $i)...
+            az vm create -n $(echo $newVmName)_$(echo $i) -g $rgName --size $(echo $vmSize) --attach-os-disk $(echo $newVmName)_$(echo $i)_osDisk \
+                --nsg "" --public-ip-address "$publicIP" \
+                --vnet-name $vnetName --subnet $(echo $subnetName) \
+                --os-type $osType --os-disk-size-gb $(echo $osDiskSize) --data-disk-sizes-gb $dataDiskSize
+                
+            echo -e \\n setting hostname and rebooting VM...
+            az vm run-command invoke -g $rgName -n $(echo $newVmName)_$(echo $i) --command-id RunShellScript --scripts \
+                'sudo hostnamectl set-hostname $1 && sudo reboot' --parameters $(echo $newVmName)_$(echo $i)
+        done
+    fi
+}
+
 # create vm with internal load balancer in the front
 createintlb () {
     lbName=$1
@@ -55,28 +171,6 @@ createintlb () {
         --frontend-ip-name $(echo $lbName)FE --backend-pool-name $(echo $lbName)BE \
         --vnet-name $vnetName --subnet $(echo $subnetName) 
 
-    # echo -e \\n creating health probe for port 80...
-    # az network lb probe create --resource-group $rgName --lb-name $(echo $lbName)LB \
-    #     --name healthprobe80 --protocol tcp --port 80
-
-    # echo -e \\n creating load balancing rule for HTTP...
-    # az network lb rule create --resource-group $rgName \
-    #     --lb-name $(echo $lbName)LB --name HTTPRule --protocol tcp --frontend-port 80 --backend-port 80 \
-    #     --frontend-ip-name $(echo $lbName)FE \
-    #     --backend-pool-name $(echo $lbName)BE \
-    #     --probe-name healthprobe80
-
-    # echo -e \\n creating health probe for port 443...
-    # az network lb probe create --resource-group $rgName --lb-name $(echo $lbName)LB \
-    #     --name healthprobe443 --protocol tcp --port 443
-
-    # echo -e \\n creating load balancing rule for HTTPS...
-    # az network lb rule create --resource-group $rgName \
-    #     --lb-name $(echo $lbName)LB --name HTTPSRule --protocol tcp --frontend-port 443 --backend-port 443 \
-    #     --frontend-ip-name $(echo $lbName)FE \
-    #     --backend-pool-name $(echo $lbName)BE \
-    #     --probe-name healthprobe443
-
     echo -e \\n creating the NICs attached to this load balancer...
     for i in `seq $numVM`; do
     echo -e \\n creating $(echo $vmName)_nic$i...
@@ -89,7 +183,7 @@ createintlb () {
     az vm availability-set create -n $(echo $vmName)av -g $rgName
 
     echo -e \\n creating $(echo $vmName) VMs in App subnet...
-    if [ !$7 ]
+    if [ ! $dataDiskSize ]
     then
         for i in `seq $numVM`; do
             az vm create -n $(echo $vmName)_$i -g $rgName --image $image --size $vmSize \
@@ -161,7 +255,7 @@ createextlb () {
     az vm availability-set create -n $(echo $vmName)av -g $rgName
 
     echo -e \\n creating $(echo $vmName) VMs in $(echo $subnetName) subnet...
-    if [ !$7 ]
+    if [ ! $dataDiskSize ]
     then
         for i in `seq $numVM`; do
             az vm create -n $(echo $vmName)_$i -g $rgName --image $image --size $(echo $vmSize) \
@@ -206,7 +300,7 @@ createappgw () {
     az vm availability-set create -n $(echo $vmName)av -g $rgName
 
     echo -e \\n creating $(echo $vmName) VMs in $(echo $subnetName) subnet...
-    if [ !$7 ]
+    if [ ! $dataDiskSize ]
     then
         for i in `seq $numVM`; do
             az vm create -n $(echo $vmName)_$i -g $rgName --image $image --size $(echo $vmSize) \
@@ -258,7 +352,7 @@ createintappgw () {
     az vm availability-set create -n $(echo $vmName)av -g $rgName
 
     echo -e \\n creating $(echo $vmName) VMs in $(echo $subnetName) subnet...
-    if [ !$7 ]
+    if [ ! $dataDiskSize ]
     then
         for i in `seq $numVM`; do
             az vm create -n $(echo $vmName)_$i -g $rgName --image $image --size $(echo $vmSize) \
@@ -384,19 +478,23 @@ createsubnet() {
     ports=$4
 
     echo -e \\n creating network security groups for the subnet...
-    az network nsg create -g $rgName -n $(echo $subnetName)-nsg
+    nsgName=$(echo $subnetName)-nsg
+    az network nsg create -g $rgName -n $nsgName
 
-    if [ !$4 ]
+    if [ ! "$ports" ]
     then
         echo -e \\n creating allow all incoming rule for NSG.. 
-        az network nsg rule create -g $rgName --nsg-name $(echo $subnetName)-nsg -n AllowAll --priority 100 \
+        count=$(az network nsg rule list --nsg-name $nsgName -g $rgName --query [].priority -o tsv |sort -g |tail -1)
+        count=${count:-100}
+        az network nsg rule create -g $rgName --nsg-name $nsgName -n AllowAll --priority $count \
             --protocol Tcp --access Allow --protocol Tcp --destination-port-ranges '*'
     else
         count=$(az network nsg rule list --nsg-name $nsgName -g $rgName --query [].priority -o tsv |sort -g |tail -1)
+        count=${count:-100}
         for i in $ports; do
             echo -e \\n adding nsg rule for port $i...
             count=$(expr $count + 1)
-            az network nsg rule create -g $rgName --nsg-name $(echo $subnetName)-nsg -n Allow_$(echo $i) --priority $count \
+            az network nsg rule create -g $rgName --nsg-name $nsgName -n Allow_$(echo $i) --priority $count \
                 --protocol Tcp --access Allow --protocol Tcp --destination-port-ranges $i
         done
     fi
