@@ -119,17 +119,17 @@ clonevm () {
             fi
 
             echo -e \\n creating copy of the OS disk...
-            az disk create -g $rgName -n $(echo $newVmName)_$(echo $i)_osDisk --sku $storageType --source $diskId
+            az disk create -g $rgName -n $(echo $newVmName)-$(echo $i)_osDisk --sku $storageType --source $diskId
 
-            echo -e \\n creating $(echo $newVmName)_$(echo $i)...
-            az vm create -n $(echo $newVmName)_$(echo $i) -g $rgName --size $(echo $vmSize) --attach-os-disk $(echo $newVmName)_$(echo $i)_osDisk \
+            echo -e \\n creating $(echo $newVmName)-$(echo $i)...
+            az vm create -n $(echo $newVmName)-$(echo $i) -g $rgName --size $(echo $vmSize) --attach-os-disk $(echo $newVmName)-$(echo $i)_osDisk \
                 --nsg "" --public-ip-address "$publicIP" \
                 --vnet-name $vnetName --subnet $(echo $subnetName) \
                 --os-type $osType --os-disk-size-gb $(echo $osDiskSize)
 
             echo -e \\n setting hostname and rebooting VM...
-            az vm run-command invoke -g $rgName -n $(echo $newVmName)_$(echo $i) --command-id RunShellScript --scripts \
-                'sudo hostnamectl set-hostname $1 && sudo reboot' --parameters $(echo $newVmName)_$(echo $i)
+            az vm run-command invoke -g $rgName -n $(echo $newVmName)-$(echo $i) --command-id RunShellScript --scripts \
+                '(sudo hostnamectl set-hostname $1 && sleep 30 && sudo reboot) &' --parameters $(echo $newVmName)-$(echo $i)
         done
     else
         for i in `seq $numVM`; do
@@ -141,17 +141,17 @@ clonevm () {
             fi
 
             echo -e \\n creating copy of the OS disk...
-            az disk create -g $rgName -n $(echo $newVmName)_$(echo $i)_osDisk --sku $storageType --source $diskId
+            az disk create -g $rgName -n $(echo $newVmName)-$(echo $i)_osDisk --sku $storageType --source $diskId
 
-            echo -e \\n creating $(echo $newVmName)_$(echo $i)...
-            az vm create -n $(echo $newVmName)_$(echo $i) -g $rgName --size $(echo $vmSize) --attach-os-disk $(echo $newVmName)_$(echo $i)_osDisk \
+            echo -e \\n creating $(echo $newVmName)-$(echo $i)...
+            az vm create -n $(echo $newVmName)-$(echo $i) -g $rgName --size $(echo $vmSize) --attach-os-disk $(echo $newVmName)-$(echo $i)_osDisk \
                 --nsg "" --public-ip-address "$publicIP" \
                 --vnet-name $vnetName --subnet $(echo $subnetName) \
                 --os-type $osType --os-disk-size-gb $(echo $osDiskSize) --data-disk-sizes-gb $dataDiskSize
                 
             echo -e \\n setting hostname and rebooting VM...
-            az vm run-command invoke -g $rgName -n $(echo $newVmName)_$(echo $i) --command-id RunShellScript --scripts \
-                'sudo hostnamectl set-hostname $1 && sudo reboot' --parameters $(echo $newVmName)_$(echo $i)
+            az vm run-command invoke -g $rgName -n $(echo $newVmName)-$(echo $i) --command-id RunShellScript --scripts \
+                '(sudo hostnamectl set-hostname $1 && sleep 30 && sudo reboot) &' --parameters $(echo $newVmName)-$(echo $i)
         done
     fi
 }
