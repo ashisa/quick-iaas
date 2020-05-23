@@ -57,12 +57,12 @@ then
     echo "createintappgw appgw-name subnet-name vm-name-prefix number-of-vms vm-size os-disks-size data-disk-size ports-for-appgw-rules"
 
     echo -e \\n"Create standalone VMs - no lb/appgw -"
-    echo "createvms vm-name-prefix subnet-name number-of-vm vm-size os-disk-size data-disk-size public-ip-if-needed"
+    echo "createvm vm-name-prefix subnet-name number-of-vm vm-size os-disk-size data-disk-size public-ip-if-needed"
     echo ""
 fi
 
 # create VMs
-createvms () {
+createvm () {
     vmName=$1
     subnetName=$2
     numVM=$3
@@ -194,6 +194,47 @@ createvmimage () {
 
     echo -e \\n deleting clone VM...
     az vm delete -g $rgName -n $newVmName --yes --no-wait
+}
+
+createvmss () {
+    lbType=$1
+    lbName=$2
+    subnetName=$3
+    numVM=$4
+    vmSize=$5
+    osDiskSize=$6
+    dataDiskSize=$7
+    publicIPName=$8
+    appgwsbcidr=$9
+
+    vmName=$(echo $lbName)vm
+
+    if [ "$1" = "app-gateway" ]
+    then
+        az network vnet subnet create -g $rgName --vnet-name $vnetName -n appGwSubnet --address-prefixes $appgwsbcidr
+        lbParams="--app-gateway $lbName --app-gateway-capacity 2 --app-gateway-sku Standard_Medium --app-gateway-subnet-address-prefix $appgwsbcidr"
+    else
+        lbParams="--load-balancer $lbName --lb-sku Standard "
+    fi
+
+
+    echo -e \\n creating vm scale set in $(echo $subnetName) subnet...
+    if [ ! "$dataDiskSize" ]
+    then
+        az vmss create -n $(echo $vmName) -g $rgName --image $image --vm-sku $(echo $vmSize) --instance-count $numVM \
+            --authentication-type all --generate-ssh-keys --admin-username $adminUser --admin-password $adminPassword \
+            --nsg $(echo $subnetName)-nsg --public-ip-address "$publicIPName" \
+            $lbParams \
+            --vnet-name $vnetName --subnet $(echo $subnetName) \
+            --storage-sku $storageType  --no-wait
+    else
+        az vmss create -n $(echo $vmName) -g $rgName --image $image --vm-sku $(echo $vmSize) --instance-count $numVM \
+            --authentication-type all --generate-ssh-keys --admin-username $adminUser --admin-password $adminPassword \
+            --nsg $(echo $subnetName)-nsg --public-ip-address "$publicIPName" \
+            $lbParams \
+            --vnet-name $vnetName --subnet $(echo $subnetName) \
+            --storage-sku $storageType --data-disk-sizes-gb $dataDiskSize  --no-wait
+    fi
 }
 
 # create vm with internal load balancer in the front
