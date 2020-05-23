@@ -57,7 +57,7 @@ source functions.sh
 # createintappgw appgw-name subnet-name vm-name-prefix number-of-vms vm-size os-disks-size data-disk-size ports-for-appgw-rules
 
 # call this function to create standalone VMs - no lb/appgw
-# createvms vm-name-prefix subnet-name number-of-vm vm-size os-disk-size data-disk-size public-ip-if-needed
+# createvm vm-name-prefix subnet-name number-of-vm vm-size os-disk-size data-disk-size public-ip-if-needed
 
 # creation starts from here
 

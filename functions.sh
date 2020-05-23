@@ -1,15 +1,6 @@
 # creating function for repeat operations
 
-# ask for missing parameters
-getarg () {
-        ENVVALUE=${$(echo $1):-NoValue}
-        if [ "$ENVVALUE" = "NoValue" ]
-        then
-                read -p "Please enter a value for $(echo $1): " $(echo $1)
-        fi
-        echo ${$1}
-}
-
+# Sourcing from shell sets up basics and show syntax
 if [ "$0" = "-bash" ]
 then
     echo "Setting up the following variables for successful execution of shell functions..."
@@ -58,6 +49,28 @@ then
 
     echo -e \\n"Create standalone VMs - no lb/appgw -"
     echo "createvm vm-name-prefix subnet-name number-of-vm vm-size os-disk-size data-disk-size public-ip-if-needed"
+
+    echo -e \\n"Clone a VM of a running/deallocated VM -"
+    echo "clonevm vm-to-be-cloned clone-vm-name-prefix subnet-name number-of-vms vm-size od-disk-size data-disk-sizes public-ip-if-needed"
+
+    echo -e \\n"Create an image of a VM without capturing the original VM -"
+    echo "createvmimage vm-name-to-be-imaged subnet-name"
+
+    echo -e \\n"Create a VM Scale Set -"
+    echo "createvmss type-of-load-balancer lb-name subnet-name number-of-vms vm-size os-disk-size data-disk-sizes public-ip-if-needed cidr-for-appgw-if-used"
+
+    echo -e \\n"Add Load Balancer (L4) rules -"
+    echo "addlbrule lb-name ports-space-separated"
+
+    echo -e \\n"Delete Load Balancer (L4) rules -"
+    echo "deletelbrule lb-name ports-space-separated"
+
+    echo -e \\n"Add Network Security Group (nsg) rules -"
+    echo "addnsgrule ports-space-separated"
+
+    echo -e \\n"Delete Network Security (nsg) rules -"
+    echo "deletensgrule ports-space-separated"
+
     echo ""
 fi
 
@@ -72,7 +85,7 @@ createvm () {
     publicIPName=$7
 
     echo -e \\n creating $(echo $vmName) VMs in $(echo $subnetName) subnet...
-    if [ ! $dataDiskSize ]
+    if [ ! "$dataDiskSize" ]
     then
         for i in `seq $numVM`; do
             az vm create -n $(echo $vmName)_$i -g $rgName --image $image --size $(echo $vmSize) \
@@ -107,8 +120,8 @@ clonevm () {
     diskSize=$(az vm show -n $vmName -g $rgName -o tsv --query storageProfile.osDisk.diskSizeGb)
     osType=$(az vm show -n $vmName -g $rgName -o tsv --query storageProfile.osDisk.osType)
 
-    echo -e \\n creating $(echo $vmName) clone VMs in $(echo $subnetName) subnet...
-    if [ ! $dataDiskSize ]
+    echo -e \\n creating $(echo $vmName) clone VM in $(echo $subnetName) subnet...
+    if [ ! "$dataDiskSize" ]
     then
         for i in `seq $numVM`; do
             if [ "$publicIPName" ]
@@ -264,7 +277,7 @@ createintlb () {
     az vm availability-set create -n $(echo $vmName)av -g $rgName
 
     echo -e \\n creating $(echo $vmName) VMs in App subnet...
-    if [ ! $dataDiskSize ]
+    if [ ! "$dataDiskSize" ]
     then
         for i in `seq $numVM`; do
             az vm create -n $(echo $vmName)_$i -g $rgName --image $image --size $vmSize \
@@ -336,7 +349,7 @@ createextlb () {
     az vm availability-set create -n $(echo $vmName)av -g $rgName
 
     echo -e \\n creating $(echo $vmName) VMs in $(echo $subnetName) subnet...
-    if [ ! $dataDiskSize ]
+    if [ ! "$dataDiskSize" ]
     then
         for i in `seq $numVM`; do
             az vm create -n $(echo $vmName)_$i -g $rgName --image $image --size $(echo $vmSize) \
@@ -381,7 +394,7 @@ createappgw () {
     az vm availability-set create -n $(echo $vmName)av -g $rgName
 
     echo -e \\n creating $(echo $vmName) VMs in $(echo $subnetName) subnet...
-    if [ ! $dataDiskSize ]
+    if [ ! "$dataDiskSize" ]
     then
         for i in `seq $numVM`; do
             az vm create -n $(echo $vmName)_$i -g $rgName --image $image --size $(echo $vmSize) \
@@ -433,7 +446,7 @@ createintappgw () {
     az vm availability-set create -n $(echo $vmName)av -g $rgName
 
     echo -e \\n creating $(echo $vmName) VMs in $(echo $subnetName) subnet...
-    if [ ! $dataDiskSize ]
+    if [ ! "$dataDiskSize" ]
     then
         for i in `seq $numVM`; do
             az vm create -n $(echo $vmName)_$i -g $rgName --image $image --size $(echo $vmSize) \
@@ -518,6 +531,7 @@ addnsgrule () {
     shift
     ports=$@
     count=$(az network nsg rule list --nsg-name $nsgName -g $rgName --query [].priority -o tsv |sort -g |tail -1)
+    count=${count:-100}
 
     for i in $ports; do
         echo -e \\n adding nsg rule for port $i...
