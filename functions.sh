@@ -156,6 +156,46 @@ clonevm () {
     fi
 }
 
+# Generalize/capture VM
+createvmimage () {
+    vmName=$1
+    newVmName=$(echo $vmName)-clone
+    subnetName=$2
+
+    diskId=$(az vm show -n $vmName -g $rgName -o tsv --query storageProfile.osDisk.managedDisk.id)
+    diskSize=$(az vm show -n $vmName -g $rgName -o tsv --query storageProfile.osDisk.diskSizeGb)
+    osType=$(az vm show -n $vmName -g $rgName -o tsv --query storageProfile.osDisk.osType)
+
+    echo -e \\n initiating cloning and generalization for $vmName...
+
+    echo -e \\n creating copy of the OS disk...
+    az disk create -g $rgName -n $(echo $newVmName)-osDisk --sku $storageType --source $diskId
+
+    echo -e \\n creating $(echo $newVmName)...
+    az vm create -n $(echo $newVmName) -g $rgName --size Standard_b2ms --attach-os-disk $(echo $newVmName)-osDisk \
+        --nsg "" --public-ip-address "" \
+        --vnet-name $vnetName --subnet $(echo $subnetName) \
+        --os-type $osType --os-disk-size-gb $(echo $diskSize)
+
+    echo -e \\n deprovisioning VM...
+    az vm run-command invoke -g $rgName -n $(echo $newVmName) --command-id RunShellScript --scripts \
+        '(sudo sleep 60 && sudo waagent -deprovision -force && sudo shutdown -h now) &'
+    
+    echo -e \\n waiting for the VM to shutdown...
+    az vm wait -g $rgName -n $newVmName --custom instanceView.statuses[?code=="'PowerState/stopped'"]
+    az vm deallocate -g $rgName -n $newVmName
+
+    echo -e \\n generalizing VM...
+    az vm generalize -g $rgName -n $newVmName
+
+    echo -e \\n creating image VM...
+    newDiskId=$(az vm show -n $newVmName -g $rgName -o tsv --query storageProfile.osDisk.managedDisk.id)
+    az image create -g $rgName -n $(echo $vmName)-image --source $newDiskId --os-type $osType
+
+    echo -e \\n deleting clone VM...
+    az vm delete -g $rgName -n $newVmName --yes --no-wait
+}
+
 # create vm with internal load balancer in the front
 createintlb () {
     lbName=$1
