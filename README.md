@@ -15,6 +15,7 @@ Well, it also does some stuff that are common but are complex or not possible ou
 Make a clone of this repo and source the functions.sh in your scripts or DevOps pipelines.
 
 ```
+git clone https://github.com/ashisa/quick-iaas.git
 source functions.sh
 ```
 If you do this from the command line, you will see the information on what environment variables you need to set and what functions are made available in your shell that you can use to start deploying your IaaS architecture -
