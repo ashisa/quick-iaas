@@ -30,16 +30,28 @@ then
 
     echo -e \\n"Functions:"
     echo -e "Create the resource group and vnet -"
-    echo "createbaseinfra resource-group-nane location vnet-name vnet-cidr-address-range"
+    echo "createbaseinfra resource-group-name location vnet-name vnet-cidr-address-range"
 
     echo -e \\n"Create the resource group and vnet -"
     echo "createsubnet name-of-subnet vnet-name subnet-cidr-address-range nsg-ports-to-open"
 
-    echo -e \\n"Create VMs with external load balancer (L4) -"
-    echo "createextlb lb-name subnet-name vm-name-prefix number-of-vm vm-size os-disk-size data-disk-size-if-needed"
+    echo -e \\n"Create standalone VMs - no lb/appgw -"
+    echo "createvm vm-name-prefix subnet-name number-of-vm vm-size os-disk-size data-disk-size public-ip-if-needed"
+
+    echo -e \\n"Clone a VM of a running/deallocated VM -"
+    echo "clonevm vm-to-be-cloned clone-vm-name-prefix subnet-name number-of-vms vm-size os-disk-size data-disk-sizes public-ip-if-needed"
+
+    echo -e \\n"Create an image of a VM without capturing the original VM -"
+    echo "createvmimage vm-name-to-be-imaged subnet-name"
+
+    echo -e \\n"Create a VM Scale Set -"
+    echo "createvmss type-of-load-balancer lb-name subnet-name number-of-vms vm-size os-disk-size data-disk-sizes public-ip-if-needed cidr-for-appgw-if-used"
 
     echo -e \\n"Create VMs with internal load balancer (L4) -"
-    echo "createintlb lb-name subnet-name vm-name-prefix number-of-vm vm-size os-disk-size data-disk-size-if-needed"
+    echo "createintlb lb-name-prefix subnet-name vm-name-prefix number-of-vm vm-size os-disk-size data-disk-size-if-needed"
+
+    echo -e \\n"Create VMs with external load balancer (L4) -"
+    echo "createextlb lb-name-prefix subnet-name vm-name-prefix number-of-vm vm-size os-disk-size data-disk-size-if-needed"
 
     echo -e \\n"Create VMs with public application gateway (L7) -"
     echo "createappgw appgw-name subnet-name vm-name-prefix number-of-vm vm-size os-disk-size data-disk-size-if-needed"
@@ -47,17 +59,8 @@ then
     echo -e \\n"Create VMs with internal application gateway (L7) -"
     echo "createintappgw appgw-name subnet-name vm-name-prefix number-of-vms vm-size os-disks-size data-disk-size ports-for-appgw-rules"
 
-    echo -e \\n"Create standalone VMs - no lb/appgw -"
-    echo "createvm vm-name-prefix subnet-name number-of-vm vm-size os-disk-size data-disk-size public-ip-if-needed"
-
-    echo -e \\n"Clone a VM of a running/deallocated VM -"
-    echo "clonevm vm-to-be-cloned clone-vm-name-prefix subnet-name number-of-vms vm-size od-disk-size data-disk-sizes public-ip-if-needed"
-
-    echo -e \\n"Create an image of a VM without capturing the original VM -"
-    echo "createvmimage vm-name-to-be-imaged subnet-name"
-
-    echo -e \\n"Create a VM Scale Set -"
-    echo "createvmss type-of-load-balancer lb-name subnet-name number-of-vms vm-size os-disk-size data-disk-sizes public-ip-if-needed cidr-for-appgw-if-used"
+    echo -e \\n"Add Application Gateway rules for an existing gateway -"
+    echo "addappgwrule appgw-name vm-name-prefix ports-for-appgw-rules"
 
     echo -e \\n"Add Load Balancer (L4) rules -"
     echo "addlbrule lb-name ports-space-separated"
@@ -66,10 +69,10 @@ then
     echo "deletelbrule lb-name ports-space-separated"
 
     echo -e \\n"Add Network Security Group (nsg) rules -"
-    echo "addnsgrule ports-space-separated"
+    echo "addnsgrule nsg-name ports-space-separated"
 
     echo -e \\n"Delete Network Security (nsg) rules -"
-    echo "deletensgrule ports-space-separated"
+    echo "deletensgrule nsg-name ports-space-separated"
 
     echo ""
 fi
@@ -416,6 +419,7 @@ createappgw () {
     address=$(echo $address)" "$(echo $a)
         addresses=$(echo $addresses)" "$(az network nic show --name $(echo $vmName)_nic$i --resource-group $rgName | grep "\"privateIpAddress\":" | grep -oE '[^ ]+$' | tr -d '",')
     done
+
     az network application-gateway create --name $appgwName --location $location --resource-group $rgName \
     --capacity 1 --sku Standard_v2 --http-settings-cookie-based-affinity Enabled \
     --public-ip-address $(echo $appgwName)pubIP --http-settings-protocol Https --http-settings-port 443 \
@@ -491,6 +495,26 @@ createintappgw () {
     done
 }
 
+addappgwrule () {
+    appgwName=$1
+    vmName=$2
+    shift
+    ports=$@
+
+    for i in $ports; do
+        echo -e \\n creating frontend port $i... 
+        az network application-gateway frontend-port create -g $rgName --gateway-name $appgwName -n $(echo $vmName)fe_$(echo $i) --port $i
+        echo -e \\n creating http listener... 
+        az network application-gateway http-listener create -g $rgName --gateway-name $appgwName --frontend-port $(echo $vmName)fe_$(echo $i) -n $(echo $vmName)listener_$(echo $i)
+        echo -e \\n creating http setting... 
+        az network application-gateway http-settings create -g $rgName --gateway-name $appgwName -n $(echo $vmName)setting_$(echo $i) --port $i --protocol Http --timeout 360
+        echo -e \\n creating rule... 
+        az network application-gateway rule create -g $rgName --gateway-name $appgwName -n rule_$(echo $i) --http-listener $(echo $vmName)listener_$(echo $i) --rule-type Basic \
+        --address-pool $(echo $vmName)-pool --http-settings $(echo $vmName)setting_$(echo $i)
+    done
+
+}
+
 addlbrule () {
     lbName=$1
     shift
@@ -498,12 +522,12 @@ addlbrule () {
 
     for i in $ports; do
         echo -e \\n creating health probe for port $i...
-        az network lb probe create --resource-group $rgName --lb-name $(echo $lbName)LB \
+        az network lb probe create --resource-group $rgName --lb-name $(echo $lbName) \
             --name healthprobe$(echo $i) --protocol tcp --port $i
 
         echo -e \\n creating load balancing rule for port $i...
         az network lb rule create --resource-group $rgName \
-            --lb-name $(echo $lbName)LB --name rule$(echo $i) --protocol tcp --frontend-port $i --backend-port $i \
+            --lb-name $(echo $lbName) --name rule$(echo $i) --protocol tcp --frontend-port $i --backend-port $i \
             --frontend-ip-name $(echo $lbName)FE \
             --backend-pool-name $(echo $lbName)BE \
             --probe-name healthprobe$(echo $i)
@@ -518,10 +542,10 @@ deletelbrule () {
     for i in $ports; do
         echo -e \\n deleting load balancing rule for port $i...
         az network lb rule delete --resource-group $rgName \
-            --lb-name $(echo $lbName)LB --name rule$(echo $i)
+            --lb-name $(echo $lbName) --name rule$(echo $i)
 
         echo -e \\n deleting health probe for port $i...
-        az network lb probe delete --resource-group $rgName --lb-name $(echo $lbName)LB \
+        az network lb probe delete --resource-group $rgName --lb-name $(echo $lbName) \
             --name healthprobe$(echo $i)
     done
 }
