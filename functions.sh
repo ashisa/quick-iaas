@@ -1,5 +1,21 @@
 # creating function for repeat operations
 
+echo "Checking if Azure CLI is installed..."
+if [ "$(which az)" = "" ]
+then
+    echo Azure CLI not found, installing now...
+    curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
+else
+    echo Azure CLI found, continuing...
+fi
+
+echo "Checking if Azure subscription is connected..."
+if [ $(az account show -o tsv --query id 2>&1 |wc -c) -eq 40 ]
+then
+    echo -e \\n please follow the instructions below to connect to your Azure subscription...
+    az login -o tsv
+fi
+
 # Sourcing from shell sets up basics and show syntax
 if [ "$0" = "-bash" ]
 then

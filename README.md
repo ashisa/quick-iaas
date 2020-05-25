@@ -100,7 +100,7 @@ This creates a subnet in the given virtual network with the CIDR address range s
 
 When dealing with existing Network Security Groups, you can use the ***addnsgrule/deletensgrule*** functions to add/remove rules -
 ```
-addnsgrule apps-subnet-nsg 22 80 443 300-3005
+addnsgrule apps-subnet-nsg 22 80 443 3000-3005
 
 deletensgrule apps-subnet-nsg 22
 ```
