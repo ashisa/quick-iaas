@@ -570,7 +570,7 @@ addnsgrule () {
     nsgName=$1
     shift
     ports=$@
-    count=$(az network nsg rule list --nsg-name $nsgName -g $rgName --query [].priority -o tsv |sort -g |tail -1)
+    count=$(az network nsg rule list --nsg-name $nsgName -g $rgName --query [].[access,priority] -o tsv |grep ^Allow |cut -f 2 |sort -g |tail -1)
     count=${count:-100}
 
     for i in $ports; do
@@ -639,3 +639,49 @@ createsubnet() {
         --network-security-group $(echo $subnetName)-nsg
 
 }
+
+createasg () {
+    asgName=$1
+    shift
+    vmNames=$@
+
+    echo -e \\n creating the application security group $asgName...
+    az network asg show -n $asgName -g $rgName >/dev/null 2>/dev/null \
+      || az network asg create -n $asgName -g $rgName
+
+    for i in $vmNames; do
+        nicId=$(az vm nic list --vm-name $i -g $rgName -o tsv --query [0].id)
+        nicName=$(az vm nic list --vm-name $i -g $rgName -o tsv --query [0].id |awk -F/ '{print $NF}')
+        ipConfigName=$(az network nic show -n $nicName -g $rgName -o tsv --query ipConfigurations[0].name)
+
+        echo -e \\n adding $i to $asgName...
+        az network nic ip-config update --application-security-groups $asgName -n $ipConfigName --nic-name $nicName -g $rgName
+    done
+}
+
+addasgrule () {
+    nsgName=$1
+    sourceasgName=$2
+    destasgName=$3
+    shift
+    shift
+    shift
+    ports=$@
+    count=$(az network nsg rule list --nsg-name $nsgName -g $rgName --query [].[access,priority] -o tsv |grep ^Allow |cut -f 2 |sort -g |tail -1)
+    count=${count:-100}
+
+    count=$(expr $count + 1)
+    az network nsg rule create -g $rgName --nsg-name $nsgName -n asgrule-$(echo $ports |tr " " "-") \
+        --priority $count --source-asgs $sourceasgName --destination-port-ranges $ports \
+        --destination-asgs $destasgName --access Allow --protocol Tcp \
+        --description "Allow $sourceasgName to $destasgName on ports $ports"
+}
+
+deleteasgrule () {
+    nsgName=$1
+    shift
+    ports=$@
+
+    az network nsg rule delete -g $rgName --nsg-name $nsgName -n asgrule-$(echo $ports |tr " " "-")
+}
+
