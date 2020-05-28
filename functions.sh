@@ -17,7 +17,7 @@ then
 fi
 
 # Sourcing from shell sets up basics and show syntax
-if [ "$0" = "-bash" ]
+if [ "$0" = "-bash" ] || [ "$0" = "/bin/bash" ]  
 then
     echo "Setting up the following variables for successful execution of shell functions..."
     echo -e '\t'rgName
@@ -301,14 +301,14 @@ createintlb () {
         for i in `seq $numVM`; do
             az vm create -n $(echo $vmName)_$i -g $rgName --image $image --size $vmSize \
                 --authentication-type all --generate-ssh-keys --admin-username $adminUser --admin-password $adminPassword \
-                --nic $(echo $vmName)_nic$i --availability-set $(echo $vmName)av --accelerated-networking false \
+                --nic $(echo $vmName)_nic$i --availability-set $(echo $vmName)av  \
                 --os-disk-size-gb $osDiskSize --storage-sku $storageType --no-wait
         done
     else
         for i in `seq $numVM`; do
             az vm create -n $(echo $vmName)_$i -g $rgName --image $image --size $vmSize \
                 --authentication-type all --generate-ssh-keys --admin-username $adminUser --admin-password $adminPassword \
-                --nic $(echo $vmName)_nic$i --availability-set $(echo $vmName)av --accelerated-networking false \
+                --nic $(echo $vmName)_nic$i --availability-set $(echo $vmName)av  \
                 --os-disk-size-gb $osDiskSize --storage-sku $storageType --data-disk-sizes-gb $dataDiskSize --no-wait
         done
     fi
@@ -373,14 +373,14 @@ createextlb () {
         for i in `seq $numVM`; do
             az vm create -n $(echo $vmName)_$i -g $rgName --image $image --size $(echo $vmSize) \
                 --authentication-type all --generate-ssh-keys --admin-username $adminUser --admin-password $adminPassword \
-                --nics $(echo $vmName)_nic$i --availability-set $(echo $vmName)av --accelerated-networking false \
+                --nics $(echo $vmName)_nic$i --availability-set $(echo $vmName)av  \
                 --os-disk-size-gb $osDiskSize --storage-sku $storageType --no-wait
         done
     else
         for i in `seq $numVM`; do
             az vm create -n $(echo $vmName)_$i -g $rgName --image $image --size $(echo $vmSize) \
                 --authentication-type all --generate-ssh-keys --admin-username $adminUser --admin-password $adminPassword \
-                --nics $(echo $vmName)_nic$i --availability-set $(echo $vmName)av --accelerated-networking false \
+                --nics $(echo $vmName)_nic$i --availability-set $(echo $vmName)av  \
                 --os-disk-size-gb $osDiskSize --storage-sku $storageType --data-disk-sizes-gb $dataDiskSize --no-wait
         done
     fi
@@ -418,14 +418,14 @@ createappgw () {
         for i in `seq $numVM`; do
             az vm create -n $(echo $vmName)_$i -g $rgName --image $image --size $(echo $vmSize) \
                 --authentication-type all --generate-ssh-keys --admin-username $adminUser --admin-password $adminPassword \
-                --nics $(echo $vmName)_nic$i --availability-set $(echo $vmName)av --accelerated-networking false \
+                --nics $(echo $vmName)_nic$i --availability-set $(echo $vmName)av  \
                 --os-disk-size-gb $osDiskSize --storage-sku $storageType --no-wait
         done
     else
         for i in `seq $numVM`; do
             az vm create -n $(echo $vmName)_$i -g $rgName --image $image --size $(echo $vmSize) \
                 --authentication-type all --generate-ssh-keys --admin-username $adminUser --admin-password $adminPassword \
-                --nics $(echo $vmName)_nic$i --availability-set $(echo $vmName)av --accelerated-networking false \
+                --nics $(echo $vmName)_nic$i --availability-set $(echo $vmName)av  \
                 --os-disk-size-gb $osDiskSize --storage-sku $storageType --data-disk-sizes-gb $dataDiskSize --no-wait
         done
     fi
