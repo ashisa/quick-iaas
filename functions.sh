@@ -493,6 +493,7 @@ createintappgw () {
     az network application-gateway show -g $rgName -n $appgwName --query name >/dev/null 2>/dev/null \
       || az network application-gateway create --name $appgwName --location $location --resource-group $rgName \
     --capacity 2 --sku Standard_Medium \
+    --http-settings-protocol Http --http-settings-port 8080 --frontend-port 8080 \
     --vnet-name $vnetName --subnet intappgw-subnet
 
     echo -e \\n creating backend pool... 
@@ -514,6 +515,7 @@ createintappgw () {
 addappgwrule () {
     appgwName=$1
     vmName=$2
+    shift
     shift
     ports=$@
 
@@ -671,7 +673,7 @@ addasgrule () {
     count=${count:-100}
 
     count=$(expr $count + 1)
-    az network nsg rule create -g $rgName --nsg-name $nsgName -n asgrule-$(echo $ports |tr " " "-") \
+    az network nsg rule create -g $rgName --nsg-name $nsgName -n Allow-$(echo $ports |tr " " "-") \
         --priority $count --source-asgs $sourceasgName --destination-port-ranges $ports \
         --destination-asgs $destasgName --access Allow --protocol Tcp \
         --description "Allow $sourceasgName to $destasgName on ports $ports"
@@ -682,6 +684,6 @@ deleteasgrule () {
     shift
     ports=$@
 
-    az network nsg rule delete -g $rgName --nsg-name $nsgName -n asgrule-$(echo $ports |tr " " "-")
+    az network nsg rule delete -g $rgName --nsg-name $nsgName -n Allow-$(echo $ports |tr " " "-")
 }
 
