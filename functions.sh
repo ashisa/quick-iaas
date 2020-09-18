@@ -30,8 +30,8 @@ then
     subnetDMZ=dmz-subnet
     echo -e '\t'subnetApps
     subnetApps=apps-subnet
-    echo -e '\t'subnetCommmon
-    subnetCommmon=common-subnet
+    echo -e '\t'subnetCommon
+    subnetCommon=common-subnet
     echo -e '\t'adminUser
     adminUser=vmadmin
     echo -e '\t'adminPassword
