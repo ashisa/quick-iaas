@@ -540,12 +540,12 @@ addlbrule () {
 
     for i in $ports; do
         echo -e \\n creating health probe for port $i...
-        az network lb probe create --resource-group $rgName --lb-name $(echo $lbName) \
+        az network lb probe create --resource-group $rgName --lb-name $(echo $lbName)LB \
             --name healthprobe$(echo $i) --protocol tcp --port $i
 
         echo -e \\n creating load balancing rule for port $i...
         az network lb rule create --resource-group $rgName \
-            --lb-name $(echo $lbName) --name rule$(echo $i) --protocol tcp --frontend-port $i --backend-port $i \
+            --lb-name $(echo $lbName)LB --name rule$(echo $i) --protocol tcp --frontend-port $i --backend-port $i \
             --frontend-ip-name $(echo $lbName)FE \
             --backend-pool-name $(echo $lbName)BE \
             --probe-name healthprobe$(echo $i)
@@ -560,10 +560,10 @@ deletelbrule () {
     for i in $ports; do
         echo -e \\n deleting load balancing rule for port $i...
         az network lb rule delete --resource-group $rgName \
-            --lb-name $(echo $lbName) --name rule$(echo $i)
+            --lb-name $(echo $lbName)LB --name rule$(echo $i)
 
         echo -e \\n deleting health probe for port $i...
-        az network lb probe delete --resource-group $rgName --lb-name $(echo $lbName) \
+        az network lb probe delete --resource-group $rgName --lb-name $(echo $lbName)LB \
             --name healthprobe$(echo $i)
     done
 }
